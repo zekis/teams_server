@@ -10,3 +10,5 @@ data.pickle
 teams/scratch.py
 *.pkl
 *.log
+/logs
+/data

@@ -12,3 +12,6 @@ BASE_URL = os.getenv("BASE_URL")
 DATA_DIR = "data"
 RESET_CONFIG = False
 VERBOSE = True
+MAIN_AI = "gpt-3.5-turbo-16k"
+MAX_IGNORED_USER_MESSAGE = 3
+DISPATCHER_CHANNEL_ID = "botmanager"

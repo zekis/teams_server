@@ -98,5 +98,6 @@ async def messages(req: Request) -> Response:
 
 async def process_message():
     await BOT.process_message(ADAPTER)
+    
 
 

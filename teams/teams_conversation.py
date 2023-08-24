@@ -15,7 +15,7 @@ import server_logging
 from typing import List
 
 from teams.bot_manager import BotManager
-from teams.bot_comms import receive_from_bots, send_to_bot, send_to_user
+from teams.bot_comms import from_manager_to_user, send_to_bot, send_to_user
 
 from botbuilder.core import ActivityHandler, CardFactory, TurnContext, MessageFactory, ShowTypingMiddleware, ConversationState, UserState
 from botbuilder.core.teams import TeamsActivityHandler, TeamsInfo
@@ -42,7 +42,8 @@ from botbuilder.schema import (
     InvokeResponse
 )
 
-from teams.data_models import TaskModuleResponseFactory, ConversationData, UserProfile
+from teams.data_models import TaskModuleResponseFactory, ConversationData
+from teams.user_manager import UserProfile
 
 from botbuilder.schema.teams import (
     TaskModuleContinueResponse,
@@ -82,6 +83,11 @@ class TeamsConversationBot(TeamsActivityHandler):
 
     def __init__(self, app_id: str, app_password: str, conversation_state: ConversationState, user_state: UserState, conversation_references: Dict[str, ConversationReference]):
         'start by initiating reference storage'
+        self.logger = server_logging.logging.getLogger('TeamsConversationBot') 
+        self.logger.addHandler(server_logging.file_handler)
+        self.logger.info(f"Init TeamsConversationBot")
+
+
         self.conversation_references = conversation_references
         # Load conversation references if file exists
         self.filename = "conversation_references.pkl"
@@ -152,18 +158,18 @@ class TeamsConversationBot(TeamsActivityHandler):
         conversation_reference = TurnContext.get_conversation_reference(turn_context.activity)
         user_id = conversation_reference.user.id
         member = await self.get_member(turn_context)
-        server_logging.logger.info(f"member: {member.email}")
+        self.logger.info(f"member: {member.email}")
     
         #get the users details
         user_name = conversation_reference.user.name
         tenant_id = conversation_reference.conversation.tenant_id
         email_address = member.email
 
-        server_logging.logger.info(f"Message - User ID: {user_id}, TenantID: {tenant_id}")
+        server_logging.logging.info(f"Message - User ID: {user_id}, TenantID: {tenant_id}")
         
         #user used a activity (button etc)
         if value:
-            server_logging.logger.info(f"Got Activity: {turn_context.activity}")
+            self.logger.info(f"Got Activity: {turn_context.activity}")
             # Get the input value. This will be in turn_context.activity.value['acDecision'].
             selected_value = turn_context.activity.value.get('acDecision', None)
             suggestions_value = turn_context.activity.value.get('suggestions', None)
@@ -173,12 +179,12 @@ class TeamsConversationBot(TeamsActivityHandler):
             if selected_value:
                 
                 if suggestions_value:
-                    server_logging.logger.info(selected_value)
-                    server_logging.logger.info(suggestions_value)
+                    self.logger.info(selected_value)
+                    self.logger.info(suggestions_value)
                     feedback = f"user_improvements: {suggestions_value}, {selected_value}"
                     send_to_bot(user_id, feedback)
                 else:
-                    server_logging.logger.info(selected_value)
+                    self.logger.info(selected_value)
                     feedback = f"{selected_value}"
                     send_to_bot(user_id, feedback)
 
@@ -216,38 +222,34 @@ class TeamsConversationBot(TeamsActivityHandler):
                 response = self.bot_manager.run(text, user_id, user_name)
                 if response:
                     send_to_user(response, user_id)
-
-                return await turn_context.send_activities([
-                        Activity(
-                            type=ActivityTypes.typing
-                        )])
+                else:
+                    return await turn_context.send_activities([
+                            Activity(
+                                type=ActivityTypes.typing
+                            )])
 
     def _add_conversation_reference(self, activity: Activity):
         conversation_reference = TurnContext.get_conversation_reference(activity)
         self.conversation_references[conversation_reference.user.id] = conversation_reference
         # Save conversation references to disk
         with open(self.filename, "wb") as file:
-            pickle.dump(self.conversation_references, file)
-
-    def init_bot(self,user_id, bot_name):
-        current_date_time = datetime.now().date()
-        publish("Hey Bro!", user_id)
-        #put more init functions here like checking settings etc
-        
+            pickle.dump(self.conversation_references, file)        
 
     async def process_message(self, ADAPTER):
+
+        self.bot_manager.process_bot_messages()
         "process messages in the notify queue and send to users based on conversation reference"
-        bot_id, user_id, type, body, data = receive_from_bots()
+        bot_id, user_id, type, body, data = from_manager_to_user()
 
         if body:
 
-            server_logging.logger.info(f"SERVER: user_id: {user_id}, type: {type}, body: {body}")
+            self.logger.debug(f"SERVER: user_id: {user_id}, type: {type}, body: {body}")
 
             conversation_reference = self.conversation_references.get(user_id, None)
 
             if conversation_reference is None:
                 # Handle the case when the conversation reference is not found
-                server_logging.logger.info(f"Conversation reference not found for user ID: {user_id}")
+                self.logger.info(f"Conversation reference not found for user ID: {user_id}")
                 return
             
             if type == "prompt":

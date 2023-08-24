@@ -23,9 +23,8 @@ import threading
 from aiohttp import web
 from botbuilder.core.integration import aiohttp_error_middleware
 
-
 async def message_queue():
-    server_logging.logger.info("Start message processing")
+    #logger.info("Start message processing")
     while True:
         await process_message()
         await asyncio.sleep(0.5)
@@ -36,14 +35,16 @@ async def run_server():
     
     
     runner = web.AppRunner(APP)
-    server_logging.logger.info("Webserver Initiated")
+    #logger.info("Webserver Initiated")
     await runner.setup()
     await web.TCPSite(runner, host="localhost", port=config.PORT).start()
     await asyncio.Event().wait()
 
 async def main():
     
-    server_logging.logger.info("Manager Starting")
+    logger = server_logging.logging.getLogger('Server') 
+    logger.addHandler(server_logging.file_handler)
+    logger.info(f"Init Server")
 
     tasks = []
     tasks.append(asyncio.create_task(run_server()))

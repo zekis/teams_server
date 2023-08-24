@@ -25,53 +25,36 @@ class Credential:
         }
 
 class CredentialManager:
-    def __init__(self, data_dir, user_dir):
-        self.credentials = []
-        self.data_dir = data_dir
-        self.user_dir = user_dir
 
-        folder_path = f"{data_dir}/{user_dir}"
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
+    logger = server_logging.logging.getLogger('CredentialManager') 
+    logger.addHandler(server_logging.file_handler)
+    
+    def __init__(self):
+        self.credentials = []
     
     def add_credential(self, name, parameters):
+        self.logger.debug(f"{name}")
         for credential in self.credentials:
             if credential.name == name:
-                return f"A credential with the name '{name}' already exists."
+                self.delete_credential(name)
+                self.logger.debug(f"Credential {name} deleted")
         self.credentials.append(Credential(name, parameters))
-        return f"Credential Added"
+        self.logger.debug(f"Credential {name} added")
+        return True
 
     def get_credential(self, name):
+        self.logger.debug(f"{name}")
         for credential in self.credentials:
             if credential.name == name:
-                return json.dumps(credential.to_dict_with_parameters())
+                self.logger.debug(f"{credential.to_dict_with_parameters()}")
+                return credential.to_dict_with_parameters()
         return False
 
     def delete_credential(self, name):
+        self.logger.debug(f"{name}")
         for credential in self.credentials:
             if credential.name == name:
                 self.credentials.remove(credential)
-                return "Credential Deleted"
+                self.logger.debug(f"{name} deleted")
+                return True
             
-
-    def save_credentials(self):
-        file_path = f"{self.data_dir}/{self.user_dir}/credential_registry.pkl"
-        with open(file_path, 'wb') as f:
-            pickle.dump(self.credentials, f)
-
-    def load_credentials(self):
-        file_path = f"{self.data_dir}/{self.user_dir}/credential_registry.pkl"
-        if os.path.exists(file_path):
-            with open(file_path, 'rb') as f:
-                self.credentials = pickle.load(f)
-        #self.cleanup()
-        
-
-    def to_json(self, verbose=False):
-        if not self.credentials:
-            return "No credentials Loaded, Use the ADD_CREDENTIAL tool to commission a new credential"
-        else:
-            if verbose:
-                return json.dumps([credential.to_dict_with_parameters() for credential in self.credentials])
-            else:
-                return json.dumps([credential.to_dict() for credential in self.credentials])
