@@ -13,5 +13,7 @@ DATA_DIR = "data"
 RESET_CONFIG = False
 VERBOSE = True
 MAIN_AI = "gpt-3.5-turbo-16k"
-MAX_IGNORED_USER_MESSAGE = 3
+MAX_IGNORED_USER_MESSAGE = 2
 DISPATCHER_CHANNEL_ID = "botmanager"
+
+OWNER = os.getenv("OWNER")

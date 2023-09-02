@@ -8,17 +8,29 @@ comms_logger = server_logging.logging.getLogger('BotComms')
 comms_logger.addHandler(server_logging.file_handler)
 "This module handles sending and recieving between server and bots"
 
-def encode_response(user_id, prompt: str) -> str:
+def encode_response(user_id, prompt: str, credentials: list) -> str:
     "encode a <prompt> into a dict and return a string to send via rabbitmq to a bot"
     
     response = {
         "user_id": user_id,
-        "prompt": prompt
+        "prompt": prompt,
+        "credentials": credentials
     }
     comms_logger.debug(f"ENCODING: {response}")
 
     return json.dumps(response)
 
+def encode_command(bot_id, command: str, data: str) -> str:
+    "encode a <prompt> into a dict and return a string to send via rabbitmq to a bot"
+    
+    response = {
+        "bot_id": bot_id,
+        "command": command,
+        "data": data
+    }
+    comms_logger.debug(f"ENCODING: {response}")
+
+    return json.dumps(response)
 
 def decode_response(response: dict) -> str:
     "decode a dict <response> into a message and return the prompt as string"
@@ -122,21 +134,40 @@ def clear_queue(channel_id: str):
 
     message_channel.queue_declare(channel_id)
 
+    
 
-def send_to_bot(channel_id: str, user_id: str, bot_id: str, message: str):
-    "encode and send a message directly to a bot using <channel_id>"
+def from_dispatcher_to_bot_manager(bot_id: str, command: str, data: str):
+    "encode and send a message to a bot manager using <channel_id>"
 
-    comms_logger.info(f"CHANNEL: {channel_id} - {bot_id} - {message}")
+    comms_logger.debug(f"CHANNEL: {bot_id} - {command}")
 
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
     message_channel = connection.channel()
 
-    message_channel.queue_declare(queue=channel_id)
+    message_channel.queue_declare(queue=bot_id)
 
-    message = encode_response(user_id, message)
+    message = encode_command(bot_id, command, data)
 
-    message_channel.basic_publish(exchange='',routing_key=channel_id,body=message)
+    message_channel.basic_publish(exchange='',routing_key=bot_id,body=message)
+
+
+
+
+def send_to_bot(bot_id: str, user_id: str, message: str, credentials: list):
+    "encode and send a message directly to a bot using <bot_id>"
+
+    comms_logger.debug(f"CHANNEL: {bot_id} - {message}")
+
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+
+    message_channel = connection.channel()
+
+    message_channel.queue_declare(queue=bot_id)
+
+    message = encode_response(user_id, message, credentials)
+
+    message_channel.basic_publish(exchange='',routing_key=bot_id,body=message)
 
 
 def from_manager_to_user() -> str | str | str | str | str:

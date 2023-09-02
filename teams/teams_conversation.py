@@ -14,7 +14,7 @@ import server_logging
 #from common.card_factories import create_media_card
 from typing import List
 
-from teams.bot_manager import BotManager
+from teams.bot_dispatcher import BotDispatcher
 from teams.bot_comms import from_manager_to_user, send_to_bot, send_to_user
 
 from botbuilder.core import ActivityHandler, CardFactory, TurnContext, MessageFactory, ShowTypingMiddleware, ConversationState, UserState
@@ -99,7 +99,7 @@ class TeamsConversationBot(TeamsActivityHandler):
         self._app_password = app_password
         #self.ADAPTER = ADAPTER
         self.__base_url = config.BASE_URL
-        self.bot_manager = BotManager()
+        self.bot_dispatcher = BotDispatcher()
 
         if conversation_state is None:
             raise TypeError(
@@ -219,7 +219,7 @@ class TeamsConversationBot(TeamsActivityHandler):
                 message = random.choice(thinking_messages)
                 
                 #this will check the user has setup their app
-                response = self.bot_manager.run(text, user_id, user_name)
+                response = self.bot_dispatcher.run(text, user_id, user_name, tenant_id, email_address)
                 if response:
                     send_to_user(response, user_id)
                 else:
@@ -237,7 +237,7 @@ class TeamsConversationBot(TeamsActivityHandler):
 
     async def process_message(self, ADAPTER):
 
-        self.bot_manager.process_bot_messages()
+        self.bot_dispatcher.process_bot_messages()
         "process messages in the notify queue and send to users based on conversation reference"
         bot_id, user_id, type, body, data = from_manager_to_user()
 

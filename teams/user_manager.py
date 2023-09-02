@@ -36,6 +36,15 @@ class UserConfig:
         if 'no_response' not in state:
             self.no_response = "0"  # Set the default value here
 
+    def __str__(self):
+        return (f"**User Name:** {self.user_name} <br>"
+                f"**Active Bot:** {self.active_bot} <br>"
+                f"**Default Model:** {self.default_model} <br>"
+                f"**Waiting for Response:** {self.waiting_for_response} <br>"
+                f"**Waiting for Response Credential:** {self.waiting_for_response_credential} <br>"
+                f"**No Response Count:** {self.no_response} <br>"
+                f"**User ID:** {self.user_id} <br>")
+
 class UserManager:
     
     def __init__(self, data_dir):
