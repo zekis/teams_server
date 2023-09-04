@@ -194,6 +194,8 @@ def from_manager_to_user() -> str | str | str | str | str:
 
     notify_channel = connection.channel()
 
+    notify_channel.queue_declare(queue="notify")
+
     method, properties, body = notify_channel.basic_get(queue="notify",auto_ack=True)
 
     if body:

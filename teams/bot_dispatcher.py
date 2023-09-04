@@ -186,8 +186,8 @@ class BotDispatcher:
             for bot in self.botManager.bots:
                 
                 if bot.bot_id.lower() in response.lower():
-                    user_data.active_bot = response
-                    send_to_bot(user_data.active_bot, user_id, user_message, self.get_required_credentials(user_data.active_bot, user_id))
+                    user_data.active_bot = bot.bot_id
+                    send_to_bot(user_data.active_bot, user_id, user_message, self.get_required_credentials(bot.bot_id, user_id))
                     send_to_user(f"I think the {response} assistant should be able to assist with your request", user_id)
                     self.logger.info(f"Bot started {response}")
                     return True
