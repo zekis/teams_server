@@ -182,11 +182,13 @@ class TeamsConversationBot(TeamsActivityHandler):
                     self.logger.info(selected_value)
                     self.logger.info(suggestions_value)
                     feedback = f"user_improvements: {suggestions_value}, {selected_value}"
-                    send_to_bot(user_id, feedback)
+                    #send_to_bot(user_id, feedback)
+                    response = self.bot_dispatcher.run(feedback, user_id, user_name, tenant_id, email_address)
                 else:
                     self.logger.info(selected_value)
                     feedback = f"{selected_value}"
-                    send_to_bot(user_id, feedback)
+                    #send_to_bot(user_id, feedback)
+                    response = self.bot_dispatcher.run(feedback, user_id, user_name, tenant_id, email_address)
 
                 return await turn_context.send_activities([
                             Activity(
@@ -195,7 +197,8 @@ class TeamsConversationBot(TeamsActivityHandler):
             
             if config_value:
                 feedback = f"{config_value}"
-                send_to_bot(user_id, feedback)
+                #send_to_bot(user_id, feedback)
+                response = self.bot_dispatcher.run(feedback, user_id, user_name, tenant_id, email_address)
 
                 return await turn_context.send_activities([
                             Activity(
@@ -242,7 +245,8 @@ class TeamsConversationBot(TeamsActivityHandler):
         bot_id, user_id, type, body, data = from_manager_to_user()
 
         if body:
-
+            if bot_id:
+                body = f"{bot_id}: {body}"
             self.logger.debug(f"SERVER: user_id: {user_id}, type: {type}, body: {body}")
 
             conversation_reference = self.conversation_references.get(user_id, None)
@@ -252,7 +256,7 @@ class TeamsConversationBot(TeamsActivityHandler):
                 self.logger.info(f"Conversation reference not found for user ID: {user_id}")
                 return
             
-            if type == "prompt":
+            if type == "prompt" or type == None:
                 await ADAPTER.continue_conversation(
                     conversation_reference,
                     lambda turn_context: turn_context.send_activity(MessageFactory.text(body)),

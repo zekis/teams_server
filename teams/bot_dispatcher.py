@@ -4,7 +4,7 @@ import config
 import os
 import datetime
 
-from teams.bot_comms import send_to_user, send_to_bot, clear_queue, from_bot_to_dispatcher, from_dispatcher_to_bot_manager
+from teams.bot_comms import send_to_user, send_to_bot, clear_queue, from_bot_to_dispatcher, from_dispatcher_to_bot_manager, bot_to_user
 from teams.user_manager import UserManager
 from teams.bot_manager import BotManager
 from teams.credential_manager import CredentialManager
@@ -122,8 +122,9 @@ class BotDispatcher:
 
             if command:
                 #The bot manager has started
-                self.logger.info(f"{message}")
+                
                 if command == "register":
+                    self.logger.debug(f"command: {message}")
                     bot_data = message.get('data')
                     bot_description = bot_data.get('description')
                     bot_credentials = bot_data.get('required_credentials')
@@ -137,11 +138,12 @@ class BotDispatcher:
                     user_data.active_bot = ""
                     
             if prompt:
-                self.logger.info(f"{message}")
+                self.logger.info(f"prompt: {message}")
                 user_data = self.userManager.get_user(user_id)
                 #Bot has responded so update no_response to 0
                 user_data.no_response = 0
-                send_to_user(prompt, user_id)
+                #send the whole message and let teams deal with it
+                bot_to_user(message, user_id)
 
             #bot manager is still alive
             self.botManager.update_bot_registration_time(bot_id)
@@ -159,44 +161,46 @@ class BotDispatcher:
             #command was used, break
             return
 
-        if int(user_data.no_response) > config.MAX_IGNORED_USER_MESSAGE:
-            send_to_user("Assistant is busy or is unable to respond. Lets reconsider if this was the right assistant for the job...", user_id)
+        # if int(user_data.no_response) > config.MAX_IGNORED_USER_MESSAGE:
+        #     send_to_user("Assistant is busy or is unable to respond. Lets reconsider if this was the right assistant for the job...", user_id)
 
-        if user_data.active_bot == "" or user_data.active_bot == "dispatcher" or int(user_data.no_response) > config.MAX_IGNORED_USER_MESSAGE:
-            user_data.no_response = 0
-            api_key = user_data.credentialManager.get_credential('openai_api')
-            self.logger.debug(user_data.credentialManager.get_credential('openai_api'))
-            #self.logger.debug(api_key)
-            if not api_key:
-                self.logger.debug("API key missing")
-                user_data.waiting_for_response_credential = "openai_api"
-                return "API key missing"
+        # if user_data.active_bot == "" or user_data.active_bot == "dispatcher" or int(user_data.no_response) > config.MAX_IGNORED_USER_MESSAGE:
+        #     user_data.no_response = 0
+        #     send_to_user("You currently do not have active assistants", user_id)
+        #     api_key = user_data.credentialManager.get_credential('openai_api')
+        #     self.logger.debug(user_data.credentialManager.get_credential('openai_api'))
+        #     #self.logger.debug(api_key)
+        api_key = user_data.credentialManager.get_credential('openai_api')
+        if not api_key:
+            self.logger.debug("API key missing")
+            send_to_user("It seems I dont have a copy of your open API key", user_id)
+            user_data.waiting_for_response_credential = "openai_api"
+            return "API key missing"
 
-            response = self.model_response(user_message, api_key, user_data.default_model)
-            self.logger.info(f"Model response: {response}")
+        response = self.model_response(user_message, api_key, user_data.default_model)
+        self.logger.info(f"Model response: {response}")
 
-            if response:
-                #validate response
-                self.logger.info(f"Searching for registered bots")
-                for bot in self.botManager.bots:
-                    
-                    if response.lower() == bot.bot_id.lower():
-                        user_data.active_bot = response
-                        send_to_bot(user_data.active_bot, user_id, user_message, self.get_required_credentials(user_data.active_bot, user_id))
-                        self.logger.info(f"Bot started {response}")
-                        return True
-                    if response.lower() == "default":
-                        "use default bot"
-                        send_to_user("I could not find an available assistant to help with your request", user_id)
-                        self.logger.info(f"Bot started {response}")
-                        return True
-                send_to_user(response, user_id)
+        if response:
+            #validate response
+            self.logger.info(f"Searching for registered bots")
+            for bot in self.botManager.bots:
+                
+                if bot.bot_id.lower() in response.lower():
+                    user_data.active_bot = response
+                    send_to_bot(user_data.active_bot, user_id, user_message, self.get_required_credentials(user_data.active_bot, user_id))
+                    send_to_user(f"I think the {response} assistant should be able to assist with your request", user_id)
+                    self.logger.info(f"Bot started {response}")
+                    return True
+
+            #invalid response
+            self.logger.info(f"Model invalid response {response}")
+            send_to_user("I could not find an available assistant to help with your request", user_id)
             return False
-
-        else:
-            #bot already assigned
-            user_data.no_response = user_data.no_response + 1
-            send_to_bot(user_data.active_bot, user_id, user_message, self.get_required_credentials(user_data.active_bot, user_id))
+            
+        #no response
+        self.logger.info(f"Model invalid response {response}")
+        send_to_user("I could not find an available assistant to help with your request", user_id)
+        return False
     
     def get_required_credentials(self, bot_id, user_id):
         "for the registered bots required credentials, create a prompt_package containing the name, value pairs"
@@ -253,7 +257,15 @@ class BotDispatcher:
                             response = str(bot) + "\n" + response
                         
                         send_to_user(response, user_id)
-                    return True
+                        return True
+                    
+                    if sub_command:
+                        bot_command = user_command.split()[2]
+                        #forward to bot
+                        creds = self.get_required_credentials(sub_command, user_id)
+                        send_to_bot(sub_command, user_id, bot_command, creds)
+                        return True
+                    
                 if keyword == "userman":
                     sub_command = user_command.split()[1]
                     response = "unknown command"

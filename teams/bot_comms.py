@@ -63,6 +63,7 @@ def encode_message(user_id: str, type: str, prompt: str, actions=None) -> str:
 
     return json.dumps(message)
 
+
 def decode_message(message: str) -> str | str | str | str | str:
     "decode a string dict and return its components <user_id>, <type>, <prompt> and <actions> as strings"
     try:
@@ -91,6 +92,23 @@ def send_to_user(message: str, user_id: str):
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
     message = encode_message(user_id, 'prompt', message)
+
+    notify_channel = connection.channel()
+
+    notify_channel.basic_publish(exchange='',
+                      routing_key='notify',
+                      body=message)
+
+    notify_channel.close()
+
+def bot_to_user(message: str, user_id: str):
+    "publish a server <message> to a specific teams user via the notify channel"
+
+    comms_logger.info(f"{message}")
+
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+
+    message = json.dumps(message)
 
     notify_channel = connection.channel()
 
@@ -154,7 +172,7 @@ def from_dispatcher_to_bot_manager(bot_id: str, command: str, data: str):
 
 
 
-def send_to_bot(bot_id: str, user_id: str, message: str, credentials: list):
+def send_to_bot(bot_id: str, user_id: str, message: str, credentials: list = None):
     "encode and send a message directly to a bot using <bot_id>"
 
     comms_logger.debug(f"CHANNEL: {bot_id} - {message}")
