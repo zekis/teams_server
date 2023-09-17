@@ -17,3 +17,6 @@ MAX_IGNORED_USER_MESSAGE = 2
 DISPATCHER_CHANNEL_ID = "botmanager"
 
 OWNER = os.getenv("OWNER")
+FRAPPE_ENDPOINT = "https://dev.tierneymorris.com.au/api"
+FRAPPE_API_KEY = '7921959862b2681'
+FRAPPE_API_SECRET = 'e175d987cad5a30'

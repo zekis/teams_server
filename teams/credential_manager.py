@@ -12,17 +12,7 @@ class Credential:
     def __init__(self, name, value):
         self.name = name
         self.value = value
-        
-    # def to_dict_with_parameters(self):
-    #     return {
-    #         'name': self.name,
-    #         'parameters': self.parameters
-    #     }
-
-    # def to_dict(self):
-    #     return {
-    #         'name': self.name
-    #     }
+ 
     def __str__(self):
         return f"""- name: {self.name} = {self.value} <br>""" 
 
