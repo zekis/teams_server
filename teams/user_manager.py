@@ -110,6 +110,8 @@ class UserState:
         self.teams_user_default_model = "gpt-3.5-turbo-16k"
         self.waiting_for_response = False
         self.waiting_for_response_credential = ""
+        self.waiting_for_response_credential_bot_id = ""
+        self.last_request = ""
         self.no_response = 0
         
 

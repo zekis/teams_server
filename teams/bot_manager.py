@@ -57,6 +57,20 @@ class BotManager:
         self.logger.info(f"{bot_id}")
         return True
 
+    # def is_ready(self, bot_id: str) -> bool:
+    #     bot = self.get_bot(bot_id)
+    #     for cred in bot.required_credentials:
+    #         if cred.value == "":
+    #             return False
+    #     return True
+
+    # def get_missing_credential(self, bot_id: str) -> str:
+    #     bot = self.get_bot(bot_id)
+    #     for cred in bot.required_credentials:
+    #         if cred.value == "":
+    #             return cred.name
+    #     return None
+
     def get_bot(self, bot_id: str) -> BotConfig:
         self.logger.debug(f"{bot_id}")
         for bot in self.bots:
