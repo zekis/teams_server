@@ -7,7 +7,7 @@ import traceback
 import os
 import datetime
 
-from teams.credential_manager import CredentialManager
+#from teams.credential_manager import CredentialManager
 
 class BotConfig:
 

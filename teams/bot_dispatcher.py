@@ -46,10 +46,13 @@ class BotDispatcher:
         
         #if not issues
         if not registration_request:
+            self.logger.info(f"Register check passed for {user_name}")
             response = self.dispatcher(user_message, user_id)
             if response:
+                self.logger.info(f"response: {response}")
                 return response
         else:
+            self.logger.info(f"Register check failed for {user_name}")
             return registration_request
 
         
@@ -58,7 +61,7 @@ class BotDispatcher:
         """Call this when we receive a message and check the user has all their settings,
         If not, request their details and save to credential manager
         we need their API key to trigger the other bots"""
-
+        self.logger.info(f"Register check for {user_name}")
         #for all the users in the DB, which one has just send us a message
         # try:
         user_data = self.userManager.get_user(user_id)
@@ -109,16 +112,15 @@ class BotDispatcher:
                 self.userManager.add_credential(user_id, user_data.waiting_for_response_credential, user_message)
                 user_data.waiting_for_response_credential = ""
                 
-                missing_credential = self.get_missing_credential(bot_id, user_id)
+                missing_credential_name, missing_credential_description = self.get_missing_credential(bot_id, user_id)
                 #we have everything we need
-                if not missing_credential:
+                if not missing_credential_name:
                     send_to_bot(bot_id, user_id, user_data.last_request, self.get_required_credentials(bot_id, user_id))
                     user_data.waiting_for_response_credential_bot_id = ""
-                    send_to_user(f"Got what I need, sending request to {bot_id} bot", user_id)
-                    return False
+                    return f"Got what I need, sending request to {bot_id} bot"
                 else:
-                    user_data.waiting_for_response_credential = missing_credential
-                    return f"Please provide {missing_credential} for the {bot_id} bot"
+                    user_data.waiting_for_response_credential = missing_credential_name
+                    return f"Please provide {missing_credential_name} for the {bot_id} bot. {missing_credential_description}"
 
         
         #if the user doesnt exist or the user does exist but has no credentials    
@@ -159,7 +161,16 @@ class BotDispatcher:
                     self.botManager.add_bot(bot_id, bot_description, bot_credentials)
                     from_dispatcher_to_bot_manager(bot_id,"registered", datetime_str)
 
-                    
+                if command == "forward":
+                    self.logger.info(f"command: {message}")
+                    bot_data = message.get('data')
+                    bot_forward_user_id = bot_data.get('bot_user_id')
+                    bot_forward_id = bot_data.get('bot_forward_id')
+                    bot_prompt = bot_data.get('bot_prompt')
+                    if bot_forward_id == "":
+                        self.dispatcher(bot_prompt,bot_forward_user_id)
+                    else:
+                        send_to_bot(bot_forward_id, bot_forward_user_id, bot_prompt, self.get_required_credentials(bot_forward_id, bot_forward_user_id))
                     
 
                 #The bot user instance has completed its work
@@ -185,22 +196,16 @@ class BotDispatcher:
     def dispatcher(self, user_message: str, user_id):
         "check user already has a bot running, if not, determine which one to start"
         self.logger.info(user_message)
+        
 
         user_data = self.userManager.get_user(user_id)
+        user_data.last_request = user_message
 
         if self.user_commands(user_message, user_id):
             #command was used, break
             return False
 
-        # if int(user_data.no_response) > config.MAX_IGNORED_USER_MESSAGE:
-        #     send_to_user("Assistant is busy or is unable to respond. Lets reconsider if this was the right assistant for the job...", user_id)
 
-        # if user_data.active_bot == "" or user_data.active_bot == "dispatcher" or int(user_data.no_response) > config.MAX_IGNORED_USER_MESSAGE:
-        #     user_data.no_response = 0
-        #     send_to_user("You currently do not have active assistants", user_id)
-        #     api_key = user_data.credentialManager.get_credential('openai_api')
-        #     self.logger.debug(user_data.credentialManager.get_credential('openai_api'))
-        #     #self.logger.debug(api_key)
         api_key = self.userManager.get_credential(user_id, 'openai_api')
         if not api_key:
             self.logger.debug("API key missing")
@@ -220,18 +225,17 @@ class BotDispatcher:
                 if bot.bot_id.lower() in response.lower():
                     #user_data.active_bot = bot.bot_id
                     #if we have all the bots creds then 
-                    missing_credential = self.get_missing_credential(bot.bot_id, user_id)
-                    if not missing_credential:
-                        user_data.last_request = user_message
+                    missing_credential_name, missing_credential_description = self.get_missing_credential(bot.bot_id, user_id)
+                    if not missing_credential_name:
                         send_to_bot(bot.bot_id, user_id, user_message, self.get_required_credentials(bot.bot_id, user_id))
                         send_to_user(f"I think the {response} assistant should be able to assist with your request", user_id)
                         self.logger.info(f"Bot started {response}")
                         return False
                     else:
                     #otherwise we need to request the next missing cred
-                        user_data.waiting_for_response_credential = missing_credential
+                        user_data.waiting_for_response_credential = missing_credential_name
                         user_data.waiting_for_response_credential_bot_id = bot.bot_id
-                        return f"Please provide {missing_credential} for the {bot.bot_id} bot"
+                        return f"Please provide {missing_credential_name} for the {bot.bot_id} bot. {missing_credential_description}"
                     
 
             #invalid response
@@ -252,10 +256,10 @@ class BotDispatcher:
         bot_data = self.botManager.get_bot(bot_id)
 
         credential_package = []
-        for cred in bot_data.required_credentials:
-            if self.userManager.get_credential(user_id, cred):
+        for name, description in bot_data.required_credentials:
+            if self.userManager.get_credential(user_id, name):
                 #add the cred name and the value
-                credential_package.append({cred: self.userManager.get_credential(user_id, cred)})
+                credential_package.append({name: self.userManager.get_credential(user_id, name)})
         return credential_package
 
     def get_missing_credential(self, bot_id, user_id):
@@ -263,10 +267,10 @@ class BotDispatcher:
         user_data = self.userManager.get_user(user_id)
         bot_data = self.botManager.get_bot(bot_id)
 
-        for cred in bot_data.required_credentials:
-            if not self.userManager.get_credential(user_id, cred):
-                return cred
-        return None
+        for name, description in bot_data.required_credentials:
+            if not self.userManager.get_credential(user_id, name):
+                return name, description
+        return None, None
 
     def model_response(self, user_message: str, api_key: str, openai_model: str) -> str:        
         try:

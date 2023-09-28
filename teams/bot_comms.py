@@ -175,7 +175,7 @@ def from_dispatcher_to_bot_manager(bot_id: str, command: str, data: str):
 def send_to_bot(bot_id: str, user_id: str, message: str, credentials: list = None):
     "encode and send a message directly to a bot using <bot_id>"
 
-    comms_logger.debug(f"CHANNEL: {bot_id} - {message}")
+    comms_logger.info(f"CHANNEL: {bot_id} - {message}")
 
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 

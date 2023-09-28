@@ -167,7 +167,7 @@ class UserManager:
             
         }
         response = self._send_request('POST', endpoint, data)
-        self.logger.info(str(response))
+        self.logger.debug(str(response))
         if response.get('message') == 'User created':
             return True
         return True
@@ -199,7 +199,7 @@ class UserManager:
         # 2. Fetch user from the API
         endpoint = f'/resource/Teams%20User/{user_id}'
         response = self._send_request('GET', endpoint)
-        self.logger.info(str(response))
+        self.logger.debug(str(response))
 
         api_user_data = response.get('data', None) if response else None
         
@@ -225,7 +225,7 @@ class UserManager:
         }
 
         response = self._send_request('PUT', endpoint, data)
-        self.logger.info(str(response))
+        self.logger.debug(str(response))
 
         if response.get('message') == 'User updated':
             
