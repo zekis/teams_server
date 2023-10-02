@@ -286,6 +286,21 @@ class UserManager:
 
         return None
 
+    def get_all_credentials(self, user_id):
+        endpoint = f'/resource/Teams%20User/{user_id}'
+        user = self._send_request('GET', endpoint).get('data')
+        
+        if not user:
+            self.logger.error(f"User not found with ID {user_id}")
+            return None
+
+        #credentials = []
+        return user.get('teams_user_credentials', [])
+        # for cred in user.get('teams_user_credentials', []):
+        #     credentials.append(f"<li><b>{cred['credential_name']}:</b> {cred['credential_value']}</li>")
+
+        # return ''.join(credentials)
+
     def delete_credential(self, user_id, name):
         endpoint = f'/resource/Teams%20User/{user_id}'
         user = self._send_request('GET', endpoint).get('data')

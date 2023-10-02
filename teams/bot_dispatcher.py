@@ -280,7 +280,7 @@ class BotDispatcher:
 
             available_bots = "default, "
             for bot in self.botManager.bots:
-                available_bots = f"'{bot.bot_id} description: {bot.bot_description}', {available_bots}" 
+                available_bots = f"(Name: {bot.bot_id} - Description: {bot.bot_description}), {available_bots}" 
             prompt = f"""Given the following user request, identify which assistant should be able to assist. return only the assistant name
             
             request: {user_message}
@@ -340,7 +340,7 @@ class BotDispatcher:
                     if sub_command == 'ls':
                         response = ""
                         for bot in self.botManager.bots:
-                            response = str(bot) + "\n" + response
+                            response = str(bot) + "\\" + response
                         
                         send_to_user(response, user_id)
                         return True
@@ -362,9 +362,56 @@ class BotDispatcher:
                             response = str(user) + "\n" + response
                         
                         send_to_user(response, user_id)
+                    if sub_command == 'get':
+                        get_object = user_command.split()[2]
+                        if get_object == 'settings':
+
+                            all_creds = self.userManager.get_all_credentials(user_id)
+                            credentials = []
+                            for cred in all_creds:
+                                credentials.append(f"<li><b>{cred.get('credential_name')}:</b> {cred.get('credential_value')}</li>")
+
+                            response =  f"<h2>User Stored Settings</h2> <p>{''.join(credentials)}</p>"
+                            send_to_user(response, user_id)
+
+                        if get_object == 'setting':
+                            get_setting = user_command.split()[3]
+                            response = f"<b>{get_setting}:</b> {self.userManager.get_credential(user_id, get_setting)}"
+                            send_to_user(response, user_id)
+                    if sub_command == 'set':
+                        set_object = user_command.split()[2]
+                        if set_object == 'setting':
+                            set_setting = user_command.split()[3]
+                            set_value = user_command.split()[4].replace('"', '')
+                            #delete not required
+                            self.userManager.add_credential(user_id, set_setting, set_value)
+
+                            self.send_to_all_bots('credential_update', user_id)
+                            send_to_user(f"setting {set_setting} updated.", user_id)
+
+                    if sub_command == 'add':
+                        set_object = user_command.split()[2]
+                        if set_object == 'setting':
+                            set_setting = user_command.split()[3]
+                            set_value = user_command.split()[4].replace('"', '')
+                            current_value = self.userManager.get_credential(user_id, set_setting)
+                            new_value = current_value + ',' + set_value
+                            self.userManager.add_credential(user_id, set_setting, new_value)
+
+                            self.send_to_all_bots('credential_update', user_id)
+                            send_to_user(f"setting {set_setting} updated.", user_id)
                     return True
+
         return False
 
+    def send_to_all_bots(self, command, user_id):
+        all_creds = self.userManager.get_all_credentials(user_id)
+        credentials = []
+        for cred in all_creds:
+            credentials.append({cred.get('credential_name'): cred.get('credential_value')})
+        self.logger.info(credentials)
+        for bot in self.botManager.bots:
+            send_to_bot(bot.bot_id, user_id, command, credentials)
 
 
     def is_api_key_valid(self, api_key: str):
