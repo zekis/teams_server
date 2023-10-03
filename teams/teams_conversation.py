@@ -173,16 +173,21 @@ class TeamsConversationBot(TeamsActivityHandler):
             # Get the input value. This will be in turn_context.activity.value['acDecision'].
             selected_value = turn_context.activity.value.get('acDecision', None)
             suggestions_value = turn_context.activity.value.get('suggestions', None)
+            settings_value = turn_context.activity.value.get('setting', None)
             config_value = turn_context.activity.value.get('config_value', None)
             
             # You can then use the selected value to trigger the imBack event.
             if selected_value:
-                
+                self.logger.info(selected_value)
                 if suggestions_value:
-                    self.logger.info(selected_value)
+                    
                     self.logger.info(suggestions_value)
                     feedback = f"user_improvements: {suggestions_value}, {selected_value}"
                     #send_to_bot(user_id, feedback)
+                    response = self.bot_dispatcher.run(feedback, user_id, user_name, tenant_id, email_address)
+                elif settings_value:
+                    self.logger.info(settings_value)
+                    feedback = f"{selected_value} {settings_value}"
                     response = self.bot_dispatcher.run(feedback, user_id, user_name, tenant_id, email_address)
                 else:
                     self.logger.info(selected_value)

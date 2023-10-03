@@ -4,7 +4,7 @@ import config
 import os
 import datetime
 
-from teams.bot_comms import send_to_user, send_to_bot, clear_queue, from_bot_to_dispatcher, from_dispatcher_to_bot_manager, bot_to_user
+from teams.bot_comms import send_to_user, send_to_bot, clear_queue, from_bot_to_dispatcher, from_dispatcher_to_bot_manager, bot_to_user, publish_settings_list, publish_setting_card
 from teams.user_manager import UserManager
 from teams.bot_manager import BotManager
 #from teams.credential_manager import CredentialManager
@@ -336,7 +336,7 @@ class BotDispatcher:
                 if keyword == "botman":
                     sub_command = user_command.split()[1]
                     response = "unknown command"
-                    #ls
+                    # ls
                     if sub_command == 'ls':
                         response = ""
                         for bot in self.botManager.bots:
@@ -344,10 +344,42 @@ class BotDispatcher:
                         
                         send_to_user(response, user_id)
                         return True
+
+                    if sub_command == 'report':
+                        """log bug in ERP"""
+                        return True
                     
+
                     if sub_command:
                         bot_command = user_command.split()[2]
-                        #forward to bot
+                        # forward to bot
+                        if bot_command == 'settings':
+                            creds = self.get_required_credentials(sub_command, user_id)
+                            summary = []
+                            self.logger.info(creds)
+                            summary = [(k, f'botman {sub_command} get setting {k}') for item in creds for k, v in item.items()]
+
+                            # human_summary = [{'name': f'botman get setting {item["name"]}'} for item in creds]
+                            # for cred in creds:
+                            #     # title = creds.get('credential_name')
+                            #     # setting = creds.get('credential_value')
+                            #     setting = f"botman get setting {cred.name}"
+                            #     human_summary.append((cred.name, setting))
+
+                            publish_settings_list(sub_command, user_id, f'Settings for {sub_command}', summary)
+                            return True
+
+                        if bot_command == 'get':
+                            bot_sub_command = user_command.split()[3]
+                            if bot_sub_command == "setting":
+                                setting_name = user_command.split()[4]
+                                setting_desc = self.botManager.get_bot_credential_description(sub_command, setting_name)
+                                setting_value = self.userManager.get_credential(user_id, setting_name)
+                                publish_setting_card(sub_command, user_id, 'Change Setting', setting_name, setting_desc, setting_value)
+                        
+                        return True
+
+                        
                         creds = self.get_required_credentials(sub_command, user_id)
                         send_to_bot(sub_command, user_id, bot_command, creds)
                         return True
@@ -371,19 +403,21 @@ class BotDispatcher:
                             for cred in all_creds:
                                 credentials.append(f"<li><b>{cred.get('credential_name')}:</b> {cred.get('credential_value')}</li>")
 
-                            response =  f"<h2>User Stored Settings</h2> <p>{''.join(credentials)}</p>"
+                            response = f"<h2>User Stored Settings</h2> <p>{''.join(credentials)}</p>"
                             send_to_user(response, user_id)
+                            
 
                         if get_object == 'setting':
                             get_setting = user_command.split()[3]
                             response = f"<b>{get_setting}:</b> {self.userManager.get_credential(user_id, get_setting)}"
                             send_to_user(response, user_id)
+
                     if sub_command == 'set':
                         set_object = user_command.split()[2]
                         if set_object == 'setting':
                             set_setting = user_command.split()[3]
                             set_value = user_command.split()[4].replace('"', '')
-                            #delete not required
+                            # delete not required
                             self.userManager.add_credential(user_id, set_setting, set_value)
 
                             self.send_to_all_bots('credential_update', user_id)

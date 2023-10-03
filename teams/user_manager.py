@@ -285,6 +285,7 @@ class UserManager:
                 return cred['credential_value']
 
         return None
+    
 
     def get_all_credentials(self, user_id):
         endpoint = f'/resource/Teams%20User/{user_id}'

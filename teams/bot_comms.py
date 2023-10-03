@@ -3,6 +3,7 @@ import pika
 import json
 import time 
 import server_logging
+from teams.bot_cards import create_settings_card, create_setting_card
 
 comms_logger = server_logging.logging.getLogger('BotComms')
 comms_logger.addHandler(server_logging.file_handler)
@@ -15,6 +16,20 @@ def encode_response(user_id, prompt: str, credentials: list) -> str:
         "user_id": user_id,
         "prompt": prompt,
         "credentials": credentials
+    }
+    comms_logger.debug(f"ENCODING: {response}")
+
+    return json.dumps(response)
+
+def encode_response_with_actions(bot_id, user_id, prompt: str, type=None, actions=None) -> str:
+    "encode a <prompt> into a dict and return a string to send via rabbitmq to a bot"
+    
+    response = {
+        "bot_id": bot_id,
+        "user_id": user_id,
+        "type": type,
+        "prompt": prompt,
+        "actions": actions
     }
     comms_logger.debug(f"ENCODING: {response}")
 
@@ -204,5 +219,50 @@ def from_manager_to_user() -> str | str | str | str | str:
     else:
         return None, None, None, None, None
 
+def publish_settings_list(bot_id, user_id, message, strings_values):
 
+    # channel_id = bot_config.DISPATCHER_CHANNEL_ID
+    # bot_id = bot_config.BOT_ID
+    # user_id = bot_config.USER_ID
 
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+
+    notify_channel = connection.channel()
+
+    notify_channel.queue_declare(queue="notify")
+
+    # convert string to dict (hopefully our AI has formatted it correctly)
+    try:
+        cards = create_settings_card(message, strings_values)
+        # cards = create_list_card("Choose an option:", [("Option 1", "1"), ("Option 2", "2"), ("Option 3", "3")])
+    except Exception as e:
+        traceback.print_exc()
+        cards = None
+    
+    message = encode_response_with_actions(bot_id, user_id, message, "cards", cards)
+
+    notify_channel.basic_publish(exchange='', routing_key="notify", body=message)
+
+def publish_setting_card(bot_id, user_id, message, setting_name, setting_desc, current_value):
+
+    # channel_id = bot_config.DISPATCHER_CHANNEL_ID
+    # bot_id = bot_config.BOT_ID
+    # user_id = bot_config.USER_ID
+
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+
+    notify_channel = connection.channel()
+
+    notify_channel.queue_declare(queue="notify")
+
+    # convert string to dict (hopefully our AI has formatted it correctly)
+    try:
+        cards = create_setting_card(message, setting_name, setting_desc, current_value)
+        # cards = create_list_card("Choose an option:", [("Option 1", "1"), ("Option 2", "2"), ("Option 3", "3")])
+    except Exception as e:
+        traceback.print_exc()
+        cards = None
+    
+    message = encode_response_with_actions(bot_id, user_id, message, "cards", cards)
+
+    notify_channel.basic_publish(exchange='', routing_key="notify", body=message)

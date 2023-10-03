@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-import config
+import os
 import sys
 import traceback
 import uuid
@@ -11,7 +11,13 @@ from datetime import datetime
 
 # Get the current timestamp and format it
 timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-log_filename = f"./logs/server.log"
+current_path = os.getcwd() 
+log_path = f"{current_path}/../logs/"
+log_filename = f"{log_path}/server.log"
+
+
+if not os.path.exists(log_path):
+    os.mkdir(log_path)
 
 # Rotate log after reaching 5 MB, with a maximum of 5 backup log files
 file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s(%(funcName)s) - %(message)s')

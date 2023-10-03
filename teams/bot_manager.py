@@ -80,6 +80,19 @@ class BotManager:
         self.logger.warn(f"Bot not found. bot_id {bot_id}")
         return None
 
+    def get_bot_credential_description(self, bot_id: str, credential_name: str):
+        self.logger.debug(f"{bot_id}")
+        for bot in self.bots:
+            if bot.bot_id == bot_id:
+                self.logger.debug(f"found {bot.bot_id}")
+                for name, desc in bot.required_credentials:
+                    if name == credential_name:
+                        return desc
+                    
+        self.logger.warn(f"Bot not found. bot_id {bot_id}")
+        return None
+
+
     def delete_bot(self, bot_id: str) -> bool:
         for bot in self.bots:
             if bot.bot_id == bot_id:
@@ -87,7 +100,7 @@ class BotManager:
                 self.logger.info(f"{bot_id}")
                 return True
         return False
-    
+    """"""
     def update_bot_registration_time(self, bot_id: str) -> bool:
         for bot in self.bots:
             if bot.bot_id == bot_id:

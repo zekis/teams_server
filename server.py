@@ -9,7 +9,7 @@ import sys
 import traceback
 import uuid
 import server_logging
-
+import os
 
 #from datetime import datetime
 #from http import HTTPStatus
@@ -83,6 +83,3 @@ async def run_api():
 
 if __name__ == "__main__":
     asyncio.run(run_api())
-    #main()
-
-####https://aiohttp-admin2.readthedocs.io/
