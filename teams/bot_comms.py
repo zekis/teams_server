@@ -3,11 +3,14 @@ import pika
 import json
 import time 
 import server_logging
-from teams.bot_cards import create_settings_card, create_setting_card
+from teams.bot_cards import create_settings_card, create_setting_card, create_enable_card
 
 comms_logger = server_logging.logging.getLogger('BotComms')
 comms_logger.addHandler(server_logging.file_handler)
 "This module handles sending and recieving between server and bots"
+connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+notify_channel = connection.channel()
+message_channel = connection.channel()
 
 def encode_response(user_id, prompt: str, credentials: list) -> str:
     "encode a <prompt> into a dict and return a string to send via rabbitmq to a bot"
@@ -104,49 +107,49 @@ def send_to_user(message: str, user_id: str):
 
     comms_logger.info(f"{message}")
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
     message = encode_message(user_id, 'prompt', message)
 
-    notify_channel = connection.channel()
+    # notify_channel = connection.channel()
 
     notify_channel.basic_publish(exchange='',
                       routing_key='notify',
                       body=message)
 
-    notify_channel.close()
+    # notify_channel.close()
 
 def bot_to_user(message: str, user_id: str):
     "publish a server <message> to a specific teams user via the notify channel"
 
     comms_logger.info(f"{message}")
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
     message = json.dumps(message)
 
-    notify_channel = connection.channel()
+    # notify_channel = connection.channel()
 
     notify_channel.basic_publish(exchange='',
                       routing_key='notify',
                       body=message)
 
-    notify_channel.close()
+    # notify_channel.close()
 
 
 
 def from_bot_to_dispatcher(channel_id: str) -> str:
     'consume and decode a message from <channel_id> directed as a specific user'
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
-    message_channel = connection.channel()
+    # message_channel = connection.channel()
     
     message_channel.queue_declare(queue=channel_id)
 
     method, properties, body = message_channel.basic_get(queue=channel_id, auto_ack=True)
 
-    message_channel.close()
+    # message_channel.close()
 
     if body:
         response = decode_response(body)
@@ -159,9 +162,9 @@ def clear_queue(channel_id: str):
     "clear message queue (do this on start)"
     comms_logger.info("Clearing message queue")
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
-    message_channel = connection.channel()
+    # message_channel = connection.channel()
 
     message_channel.queue_delete(channel_id)
 
@@ -174,9 +177,9 @@ def from_dispatcher_to_bot_manager(bot_id: str, command: str, data: str):
 
     comms_logger.debug(f"CHANNEL: {bot_id} - {command}")
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
-    message_channel = connection.channel()
+    # message_channel = connection.channel()
 
     message_channel.queue_declare(queue=bot_id)
 
@@ -192,9 +195,9 @@ def send_to_bot(bot_id: str, user_id: str, message: str, credentials: list = Non
 
     comms_logger.info(f"CHANNEL: {bot_id} - {message}")
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
-    message_channel = connection.channel()
+    # message_channel = connection.channel()
 
     message_channel.queue_declare(queue=bot_id)
 
@@ -205,9 +208,9 @@ def send_to_bot(bot_id: str, user_id: str, message: str, credentials: list = Non
 
 def from_manager_to_user() -> str | str | str | str | str:
     "decode message from bots on the notify channel and return its components <bot_id>, <user_id>, <type>, <prompt> and <actions> as strings"
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
-    notify_channel = connection.channel()
+    # notify_channel = connection.channel()
 
     notify_channel.queue_declare(queue="notify")
 
@@ -219,21 +222,25 @@ def from_manager_to_user() -> str | str | str | str | str:
     else:
         return None, None, None, None, None
 
-def publish_settings_list(bot_id, user_id, message, strings_values):
+def publish_settings_list(bot_id, user_id, message, strings_values, button_label="Change"):
+    notify_channel.queue_declare(queue="notify")
 
-    # channel_id = bot_config.DISPATCHER_CHANNEL_ID
-    # bot_id = bot_config.BOT_ID
-    # user_id = bot_config.USER_ID
+    try:
+        cards = create_settings_card(message, strings_values,button_label)
+    except Exception as e:
+        traceback.print_exc()
+        cards = None
+    
+    message = encode_response_with_actions(bot_id, user_id, message, "cards", cards)
+    notify_channel.basic_publish(exchange='', routing_key="notify", body=message)
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-
-    notify_channel = connection.channel()
+def publish_setting_card(bot_id, user_id, message, setting_name, setting_desc, current_value):
 
     notify_channel.queue_declare(queue="notify")
 
     # convert string to dict (hopefully our AI has formatted it correctly)
     try:
-        cards = create_settings_card(message, strings_values)
+        cards = create_setting_card(message, setting_name, setting_desc, current_value)
         # cards = create_list_card("Choose an option:", [("Option 1", "1"), ("Option 2", "2"), ("Option 3", "3")])
     except Exception as e:
         traceback.print_exc()
@@ -243,21 +250,14 @@ def publish_settings_list(bot_id, user_id, message, strings_values):
 
     notify_channel.basic_publish(exchange='', routing_key="notify", body=message)
 
-def publish_setting_card(bot_id, user_id, message, setting_name, setting_desc, current_value):
 
-    # channel_id = bot_config.DISPATCHER_CHANNEL_ID
-    # bot_id = bot_config.BOT_ID
-    # user_id = bot_config.USER_ID
-
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-
-    notify_channel = connection.channel()
+def publish_bot_rego_card(user_id, bot_id, message):
 
     notify_channel.queue_declare(queue="notify")
 
     # convert string to dict (hopefully our AI has formatted it correctly)
     try:
-        cards = create_setting_card(message, setting_name, setting_desc, current_value)
+        cards = create_enable_card(message, bot_id)
         # cards = create_list_card("Choose an option:", [("Option 1", "1"), ("Option 2", "2"), ("Option 3", "3")])
     except Exception as e:
         traceback.print_exc()

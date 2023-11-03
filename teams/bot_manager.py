@@ -1,4 +1,3 @@
-
 import server_logging
 import pickle
 import json
@@ -6,6 +5,7 @@ import config
 import traceback
 import os
 import datetime
+import requests
 
 #from teams.credential_manager import CredentialManager
 
@@ -28,13 +28,24 @@ class BotConfig:
 
 class BotManager:
     
-    def __init__(self):
+    def __init__(self, frappe_base_url, api_key, api_secret):
         self.logger = server_logging.logging.getLogger('BotManager') 
         self.logger.addHandler(server_logging.file_handler)
+        self.frappe_base_url = frappe_base_url
         self.logger.info(f"Init BotManager")
-
+        self.headers = {
+            'Authorization': f'token {api_key}:{api_secret}',
+            'Content-Type': 'application/json'
+        }
         self.bots = []        
-        
+    
+    def _send_request(self, method, endpoint, data=None):
+        url = f"{self.frappe_base_url}{endpoint}"
+        response = requests.request(method, url, headers=self.headers, json=data)
+        return response.json()
+
+
+    # Called once by a bot when registering
     def add_bot(self, bot_id: str, bot_description: str, credentials: list) -> bool:
         for bot in self.bots:
             if bot.bot_id == bot_id:
@@ -57,19 +68,30 @@ class BotManager:
         self.logger.info(f"{bot_id}")
         return True
 
-    # def is_ready(self, bot_id: str) -> bool:
-    #     bot = self.get_bot(bot_id)
-    #     for cred in bot.required_credentials:
-    #         if cred.value == "":
-    #             return False
-    #     return True
+    def add_bot_api(self, bot_id: str, bot_description: str, credentials: list) -> bool:
+        self.logger.info("Adding bot: %s", bot_id)
 
-    # def get_missing_credential(self, bot_id: str) -> str:
-    #     bot = self.get_bot(bot_id)
-    #     for cred in bot.required_credentials:
-    #         if cred.value == "":
-    #             return cred.name
-    #     return None
+        # Check if bot already exists
+        existing_bot = self.get_bot_api(bot_id)
+        if existing_bot is not None:
+            self.logger.info("Bot %s already exists.", bot_id)
+            return True
+
+        settings_package = []
+        for name, description in credentials:
+            settings_package.append({'name1': name, 'description': description})
+            
+        endpoint = '/resource/Teams%20Bot'
+        data = {
+            'name': bot_id,
+            'description': bot_description,
+            'settings': settings_package
+        }
+        response = self._send_request('POST', endpoint, data)
+        self.logger.debug(str(response))
+        if response.get('message') == 'Bot created':
+            return True
+        return True
 
     def get_bot(self, bot_id: str) -> BotConfig:
         self.logger.debug(f"{bot_id}")
@@ -79,6 +101,30 @@ class BotManager:
                 return bot
         self.logger.warn(f"Bot not found. bot_id {bot_id}")
         return None
+
+    def get_bots_api(self):
+        # 2. Fetch user from the API
+        endpoint = f'/resource/Teams%20Bot'
+        response = self._send_request('GET', endpoint)
+        self.logger.info(str(response))
+
+        api_bots_data = response.get('data', None) if response else None
+        
+        return response.get('data', None)
+
+
+    def get_bot_api(self, bot_id: str):
+        endpoint = f'/resource/Teams%20Bot/{bot_id}'
+        response = self._send_request('GET', endpoint)
+        self.logger.debug("Response from server: %s", response)
+
+        if response:
+            return response.get('data')
+        else:
+            self.logger.error("Failed to get bot with ID %s", bot_id)
+            return None
+
+
 
     def get_bot_credential_description(self, bot_id: str, credential_name: str):
         self.logger.debug(f"{bot_id}")
@@ -117,7 +163,7 @@ class BotManager:
 
         for bot in self.bots:
             time_diff = current_time - bot.bot_register_datetime
-            if time_diff.total_seconds() > 60:  # 300 seconds is 5 minutes
+            if time_diff.total_seconds() > 120:  # 300 seconds is 5 minutes
                 bots_to_remove.append(bot.bot_id)
 
         for bot_id in bots_to_remove:

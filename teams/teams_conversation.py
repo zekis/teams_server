@@ -155,6 +155,7 @@ class TeamsConversationBot(TeamsActivityHandler):
         value = turn_context.activity.value
         text = turn_context.activity.text
         
+
         conversation_reference = TurnContext.get_conversation_reference(turn_context.activity)
         user_id = conversation_reference.user.id
         member = await self.get_member(turn_context)
@@ -171,6 +172,7 @@ class TeamsConversationBot(TeamsActivityHandler):
         if value:
             self.logger.info(f"Got Activity: {turn_context.activity}")
             # Get the input value. This will be in turn_context.activity.value['acDecision'].
+            
             selected_value = turn_context.activity.value.get('acDecision', None)
             suggestions_value = turn_context.activity.value.get('suggestions', None)
             settings_value = turn_context.activity.value.get('setting', None)
@@ -238,7 +240,12 @@ class TeamsConversationBot(TeamsActivityHandler):
 
     def _add_conversation_reference(self, activity: Activity):
         conversation_reference = TurnContext.get_conversation_reference(activity)
+        self.logger.info(conversation_reference)
+        
         self.conversation_references[conversation_reference.user.id] = conversation_reference
+        # Inits bots that have scheduled tasks so they start imedietly.
+
+        #self.bot_dispatcher.init_bots(conversation_reference.user.id)
         # Save conversation references to disk
         with open(self.filename, "wb") as file:
             pickle.dump(self.conversation_references, file)        
