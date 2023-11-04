@@ -257,6 +257,7 @@ class UserManager:
             return None
             
         #credentials = []
+        self.logger.info(user.get('teams_user_bots'))
         return user.get('teams_user_bots', [])
 
     def get_available_bots(self):

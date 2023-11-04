@@ -153,7 +153,7 @@ class BotManager:
                 bot.bot_register_datetime = datetime.datetime.now()
                 self.logger.debug(f"{str(bot.bot_register_datetime)} for bot with id {bot_id}")
                 return True
-        self.logger.warn(f"Bot not found. bot_id {bot_id}")
+        self.logger.warn(f"New bot {bot_id}")
         return False
 
 

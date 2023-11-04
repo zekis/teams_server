@@ -230,13 +230,15 @@ class TeamsConversationBot(TeamsActivityHandler):
                 
                 #this will check the user has setup their app
                 response = self.bot_dispatcher.run(text, user_id, user_name, tenant_id, email_address)
-                if response:
-                    send_to_user(response, user_id)
-                else:
+                if response == 'wait':
                     return await turn_context.send_activities([
                             Activity(
                                 type=ActivityTypes.typing
                             )])
+                if response:
+                    send_to_user(response, user_id)
+                    
+                    
 
     def _add_conversation_reference(self, activity: Activity):
         conversation_reference = TurnContext.get_conversation_reference(activity)

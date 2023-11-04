@@ -81,8 +81,8 @@ class BotDispatcher:
                 if self.is_api_key_valid(user_message):
                     self.set_default_credentials(user_id, user_message, tenant_id, user_name, email_address)
                     user_data.waiting_for_response_credential = ""
-                    if not self.send_registered_bots(user_id):
-                        return
+                    # if not self.send_registered_bots(user_id):
+                    return "API key accepted"
 
                 else:
                     user_data.waiting_for_response_credential = "openai_api"
@@ -99,7 +99,7 @@ class BotDispatcher:
                 missing_credential_name, missing_credential_description = self.get_missing_credential(bot_id, user_id)
                 #we have everything we need
                 if not missing_credential_name:
-                    send_to_bot(bot_id, user_id, user_data.last_request, self.get_required_credentials(bot_id, user_id))
+                    self.send_to_bot(bot_id, user_id, user_data.last_request)
                     user_data.waiting_for_response_credential_bot_id = ""
                     return f"Got what I need, sending request to {bot_id} bot"
                 else:
@@ -119,23 +119,25 @@ class BotDispatcher:
             new_user.waiting_for_response_credential = "openai_api"
             return f"Welcome {user_name}, please enter your Open AI key to get started"
 
-    def send_registered_bots(self, user_id):
-        # Todo: If the user has no available bots, Send a list of available bots to register
-        registered_bots = self.userManager.get_registered_bots(user_id)
-        if not registered_bots:
-            #list available bots
-            available_bots = self.botManager.get_bots_api()
-            summary = []
-            for bot in available_bots:
-                summary.append((bot.get('name'), f'botman {bot.get("name")} register'))
-                        
-            publish_settings_list('No Registered Bots', user_id, f'No Registered Bots. First select a bot to register', summary, "Register")
-            return False
-        else:
-            return True
+    def send_available_bots(self, user_id):
+        #list available bots
+        available_bots = self.botManager.get_bots_api()
+        summary = []
+        for bot in available_bots:
+            summary.append((bot.get('name'), f'botman {bot.get("name")} register'))
                     
-        # except Exception as e:
-        #     self.logger.error(f"{e} \n {traceback.format_exc()}")    
+        publish_settings_list('Available bots', user_id, f'Select a bot to register', summary, "Register")
+            
+
+    def get_registered_bots(self, user_id):
+        # check if the user has any registered bots
+        registered_bots = self.userManager.get_registered_bots(user_id)
+        if registered_bots:
+            return registered_bots
+        else:
+            return False
+                    
+  
     def set_default_credentials(self, user_id, open_ai_key=None, tenant_id = None, user_name = None, email_address = None):
         if open_ai_key: 
             self.userManager.add_credential(user_id, "openai_api", open_ai_key)
@@ -162,6 +164,61 @@ class BotDispatcher:
     def set_default_credential(self, user_id, settings, value):
         if self.userManager.get_credential(user_id, settings) == "":
             self.userManager.add_credential(user_id, settings, value)
+
+    def send_to_bot(self, bot_id: str, user_id: str, message: str):
+        #check bot exists
+        available_bots = self.botManager.get_bots_api()
+        for available_bot in available_bots:
+
+            available_bot_name = available_bot.get('name')
+            if available_bot_name.lower() in bot_id.lower():
+                self.logger.info(f"Bot Available {bot_id}")
+                #check bot is registered
+                registered_bots = self.userManager.get_registered_bots(user_id)
+
+                #if user has no bots registered, send the whole list
+                if registered_bots == None:
+                    self.logger.info(f"No Registered Bots for {user_id}")
+                    self.send_available_bots(user_id)
+                    return True
+
+                self.logger.info(f"Registered bots {registered_bots}")
+                for bot in registered_bots:
+                
+                    user_bot_id = bot.get('bot_id')
+                    user_bot_enabled = bot.get('bot_enabled')
+                    #check user has bot enabled
+                    if user_bot_id.lower() in bot_id.lower():
+                        self.logger.info(f"Found Registered Bot {bot_id}")
+                        if user_bot_enabled:
+                            self.logger.info(f"Bot Enabled {bot_id}")
+                            #check user has all the credentials
+                            self.set_default_credentials(user_id)
+                            missing_credential_name, missing_credential_description = self.get_missing_credential(user_bot_id, user_id)
+                                        
+                            # Send to bot
+                            if not missing_credential_name:
+                                self.logger.info(f"Send to bot {bot_id}")
+                                send_to_bot(user_bot_id, user_id, message, self.get_required_credentials(user_bot_id, user_id)) 
+                                return True
+                            else:
+                                #otherwise we need to request the next missing cred
+                                self.logger.info(f"Bot Credential Missing {missing_credential_name}")
+                                user_data.waiting_for_response_credential = missing_credential_name
+                                user_data.waiting_for_response_credential_bot_id = bot_name
+                                send_to_user(f"Please provide {missing_credential_name} for the {bot_name} bot. {missing_credential_description}", user_id)
+                                return True
+                        else:
+                            #Not enabled
+                            publish_bot_rego_card(user_id, bot_id, f"The {bot_id} bot is registered but not enabled for you. Would you like to enable it?")
+                            return True
+                    
+                #Bot not registered with user
+                publish_bot_rego_card(user_id, bot_id, f"A new {bot_id} bot is available. Would you like to enable it?")
+                return True
+        #bot doesnt exist
+        return False
+        
 
 
     def process_bot_messages(self):
@@ -194,20 +251,39 @@ class BotDispatcher:
                     self.botManager.add_bot_api(bot_id, bot_description, bot_credentials)
 
                     from_dispatcher_to_bot_manager(bot_id,"registered", datetime_str)
-                    
+
+                    self.botManager.update_bot_registration_time(bot_id)
+
                     # Lets auto start bots for our users using a command
                     # this will start automated scheduled tasks
                     for user in self.userManager.users:
-                        self.set_default_credentials(user)
-                        missing_credential_name, missing_credential_description = self.get_missing_credential(bot_id, user)
+                        self.logger.info(user)
+                        self.send_to_bot(bot_id, user, 'start_scheduled_tasks')
+                        # registered_bots = self.userManager.get_registered_bots(user)
+                        # self.logger.info(registered_bots)
+                        # # Check if bot enabled, if not just recommend enabling the bot
+                        # for bot in registered_bots:
+                        #     bot_name = bot.get('bot_id')
+                        #     bot_enabled = bot.get('bot_enabled')
+
+                        #     if bot_name.lower() == bot_id.lower():
+                        #         if bot_enabled:
+                        #             self.set_default_credentials(user)
+                        #             missing_credential_name, missing_credential_description = self.get_missing_credential(bot_name, user)
+                                    
+                        #             # The user already has all the credentials, Lets start the bot
+                        #             if not missing_credential_name:
+                        #                 self.logger.debug(f"Starting Scheduled Tasks for {bot_name}")
+                        #                 send_to_bot(bot_name, user, 'start_scheduled_tasks', self.get_required_credentials(bot_name, user))
+                        #                 return
+                                    
+                        #         else:
+                        #             return
+                        # # Not registered or not enabled
+                        # publish_bot_rego_card(user_id, bot_name, f"A new bot {bot_name} is now available. Would you like to enable it?")
+                    return
                         
-                        # The user already has all the credentials, Lets start the bot
-                        # The problem here is for every user * every bot, we send all the credentials. This takes some time on startup
-                        # Option 1, only send to bots that have a scheduler
-                        # Option 2, only send to bots that a user has enabled
-                        if not missing_credential_name:
-                            self.logger.debug(f"Starting Scheduled Tasks for {bot_id}")
-                            send_to_bot(bot_id, user, 'start_scheduled_tasks', self.get_required_credentials(bot_id, user))
+                                        
                 
 
                 if command == "forward":
@@ -219,7 +295,8 @@ class BotDispatcher:
                     if bot_forward_id == "":
                         self.dispatcher(bot_prompt,bot_forward_user_id)
                     else:
-                        send_to_bot(bot_forward_id, bot_forward_user_id, bot_prompt, self.get_required_credentials(bot_forward_id, bot_forward_user_id))
+                        #send_to_bot(bot_forward_id, bot_forward_user_id, bot_prompt, self.get_required_credentials(bot_forward_id, bot_forward_user_id))
+                        self.send_to_bot(bot_forward_id, bot_forward_user_id, bot_prompt)
                     
 
                 #The bot user instance has completed its work
@@ -248,19 +325,6 @@ class BotDispatcher:
         
     def dispatcher(self, user_message: str, user_id):
         
-        # Design change
-        # Not all users need access to all bots
-        # Need a way to track which bots users wish to enable
-        # Ensure botmanagers only start bots that are enabled
-        # Keep track of which users have enabled which bots
-        # Perhaps advertise new bots
-        # On activation/enable, users must configure the settings
-        # Create a new doctype in ERP to track teams users to bots
-        
-        
-        "check user already has a bot running, if not, determine which one to start"
-
-
         self.logger.info(user_message)
         
         # Return the users credentials and registered bots
@@ -268,12 +332,16 @@ class BotDispatcher:
         user_data.last_request = user_message
 
         # Run the message past our debug commands
-        if self.user_commands(user_message, user_id):
-            #command was used, break
+        command_response = self.user_commands(user_message, user_id)
+        if command_response:
+            #command was used, break or wait (typing indicator)
+            if command_response == 'wait':
+                return command_response
             return False
         
         # No registered bots
-        if not self.send_registered_bots(user_id):
+        if not self.get_registered_bots(user_id):
+            self.send_available_bots(user_id)
             return False
 
         # We cant determine which bot to use without openAI as a minimum
@@ -295,35 +363,39 @@ class BotDispatcher:
         if response:
             #validate response
             self.logger.info(f"Searching for registered bots")
+            
+            if self.send_to_bot(response, user_id, user_message):
+                return 'wait'
 
-            registered_bots = self.userManager.get_registered_bots(user_id)
-            self.logger.info(registered_bots)
-            # Check if bot enabled, if not just recommend enabling the bot
-            for bot in registered_bots:
+
+            # registered_bots = self.userManager.get_registered_bots(user_id)
+            # self.logger.info(registered_bots)
+            # # Check if bot enabled, if not just recommend enabling the bot
+            # for bot in registered_bots:
                 
-                if bot.get('bot_id').lower() in response.lower():
-                    # Todo: Check if the user has this bot enabled
-                    bot_name = bot.get('bot_id')
-                    bot_enabled = bot.get('bot_enabled')
+            #     if bot.get('bot_id').lower() in response.lower():
+            #         # Todo: Check if the user has this bot enabled
+            #         bot_name = bot.get('bot_id')
+            #         bot_enabled = bot.get('bot_enabled')
 
-                    if bot_enabled:
-                        # if we have all the bots creds then 
-                        missing_credential_name, missing_credential_description = self.get_missing_credential(bot_name, user_id)
-                        if not missing_credential_name:
-                            send_to_bot(bot_name, user_id, user_message, self.get_required_credentials(bot_name, user_id))
-                            send_to_user(f"I think the {response} assistant should be able to assist with your request", user_id)
-                            self.logger.info(f"Bot started {response}")
-                            return False
-                        else:
-                        #otherwise we need to request the next missing cred
-                            user_data.waiting_for_response_credential = missing_credential_name
-                            user_data.waiting_for_response_credential_bot_id = bot_name
-                            return f"Please provide {missing_credential_name} for the {bot_name} bot. {missing_credential_description}"
-                    else:
-                        #bot not enabled
-                        #Todo offer to enable
-                        publish_bot_rego_card(user_id, bot_name, f"I recommend using the {bot_name} bot for this task but it is not enabled. Would you like to enable it?")
-                        return False
+            #         if bot_enabled:
+            #             # if we have all the bots creds then 
+            #             missing_credential_name, missing_credential_description = self.get_missing_credential(bot_name, user_id)
+            #             if not missing_credential_name:
+            #                 send_to_bot(bot_name, user_id, user_message, self.get_required_credentials(bot_name, user_id))
+            #                 send_to_user(f"I think the {response} assistant should be able to assist with your request", user_id)
+            #                 self.logger.info(f"Bot started {response}")
+            #                 return False
+            #             else:
+            #             #otherwise we need to request the next missing cred
+            #                 user_data.waiting_for_response_credential = missing_credential_name
+            #                 user_data.waiting_for_response_credential_bot_id = bot_name
+            #                 return f"Please provide {missing_credential_name} for the {bot_name} bot. {missing_credential_description}"
+            #         else:
+            #             #bot not enabled
+            #             #Todo offer to enable
+            #             publish_bot_rego_card(user_id, bot_name, f"I recommend using the {bot_name} bot for this task but it is not enabled. Would you like to enable it?")
+            #             return False
 
             
 
@@ -475,8 +547,8 @@ class BotDispatcher:
 
                     # forward to bot
                     creds = self.get_required_credentials(sub_command, user_id)
-                    send_to_bot(sub_command, user_id, bot_command, creds)
-                    return True
+                    self.send_to_bot(sub_command, user_id, bot_command)
+                    return 'wait'
 
                 
             if keyword == "userman":

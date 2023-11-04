@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 
 from typing import Union
-from teams.credential_manager import CredentialManager
+
 from teams.user_manager import UserManager
 
 import config
