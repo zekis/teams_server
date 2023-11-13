@@ -159,7 +159,7 @@ class TeamsConversationBot(TeamsActivityHandler):
         conversation_reference = TurnContext.get_conversation_reference(turn_context.activity)
         user_id = conversation_reference.user.id
         member = await self.get_member(turn_context)
-        self.logger.info(f"member: {member.email}")
+        self.logger.debug(f"member: {member.email}")
     
         #get the users details
         user_name = conversation_reference.user.name
@@ -170,7 +170,7 @@ class TeamsConversationBot(TeamsActivityHandler):
         
         #user used a activity (button etc)
         if value:
-            self.logger.info(f"Got Activity: {turn_context.activity}")
+            self.logger.debug(f"Got Activity: {turn_context.activity}")
             # Get the input value. This will be in turn_context.activity.value['acDecision'].
             
             selected_value = turn_context.activity.value.get('acDecision', None)
@@ -180,19 +180,19 @@ class TeamsConversationBot(TeamsActivityHandler):
             
             # You can then use the selected value to trigger the imBack event.
             if selected_value:
-                self.logger.info(selected_value)
+                self.logger.debug(selected_value)
                 if suggestions_value:
                     
-                    self.logger.info(suggestions_value)
+                    self.logger.debug(suggestions_value)
                     feedback = f"user_improvements: {suggestions_value}, {selected_value}"
                     #send_to_bot(user_id, feedback)
                     response = self.bot_dispatcher.run(feedback, user_id, user_name, tenant_id, email_address)
                 elif settings_value:
-                    self.logger.info(settings_value)
+                    self.logger.debug(settings_value)
                     feedback = f"{selected_value} {settings_value}"
                     response = self.bot_dispatcher.run(feedback, user_id, user_name, tenant_id, email_address)
                 else:
-                    self.logger.info(selected_value)
+                    self.logger.debug(selected_value)
                     feedback = f"{selected_value}"
                     #send_to_bot(user_id, feedback)
                     response = self.bot_dispatcher.run(feedback, user_id, user_name, tenant_id, email_address)
@@ -237,12 +237,12 @@ class TeamsConversationBot(TeamsActivityHandler):
                             )])
                 if response:
                     send_to_user(response, user_id)
-                    
+
                     
 
     def _add_conversation_reference(self, activity: Activity):
         conversation_reference = TurnContext.get_conversation_reference(activity)
-        self.logger.info(conversation_reference)
+        self.logger.debug(conversation_reference)
         
         self.conversation_references[conversation_reference.user.id] = conversation_reference
         # Inits bots that have scheduled tasks so they start imedietly.
@@ -260,17 +260,20 @@ class TeamsConversationBot(TeamsActivityHandler):
 
         if body:
             if bot_id:
-                body = f"{bot_id}: {body}"
+                body = f"{body}"
             self.logger.debug(f"SERVER: user_id: {user_id}, type: {type}, body: {body}")
 
             conversation_reference = self.conversation_references.get(user_id, None)
 
             if conversation_reference is None:
                 # Handle the case when the conversation reference is not found
-                self.logger.info(f"Conversation reference not found for user ID: {user_id}")
+                self.logger.debug(f"Conversation reference not found for user ID: {user_id}")
                 return
             
+            # some kind off memory
+
             if type == "prompt" or type == None:
+                #self.bot_dispatcher.save_previous_response(user_id, body)
                 await ADAPTER.continue_conversation(
                     conversation_reference,
                     lambda turn_context: turn_context.send_activity(MessageFactory.text(body)),
@@ -283,6 +286,7 @@ class TeamsConversationBot(TeamsActivityHandler):
                     attachments=[self.create_hero_card(body, actions)]
                     
                 )
+                #self.bot_dispatcher.save_previous_response(user_id, data)
                 await ADAPTER.continue_conversation(
                     conversation_reference,
                     lambda turn_context: turn_context.send_activity(message),
@@ -296,6 +300,7 @@ class TeamsConversationBot(TeamsActivityHandler):
                         attachments=[CardFactory.adaptive_card(card_data)]
                         
                     )
+                    #self.bot_dispatcher.save_previous_response(user_id, data)
                     await ADAPTER.continue_conversation(
                         conversation_reference,
                         lambda turn_context: turn_context.send_activity(message),

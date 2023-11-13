@@ -5,7 +5,7 @@ import time
 import server_logging
 from teams.bot_cards import create_settings_card, create_setting_card, create_enable_card
 
-comms_logger = server_logging.logging.getLogger('BotComms')
+comms_logger = server_logging.logging.getLogger('BOT-COMMS')
 comms_logger.addHandler(server_logging.file_handler)
 "This module handles sending and recieving between server and bots"
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
@@ -105,7 +105,7 @@ def decode_message(message: str) -> str | str | str | str | str:
 def send_to_user(message: str, user_id: str):
     "publish a server <message> to a specific teams user via the notify channel"
 
-    comms_logger.info(f"{message}")
+    comms_logger.debug(f"{message}")
 
     # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
@@ -122,7 +122,7 @@ def send_to_user(message: str, user_id: str):
 def bot_to_user(message: str, user_id: str):
     "publish a server <message> to a specific teams user via the notify channel"
 
-    comms_logger.info(f"{message}")
+    comms_logger.debug(f"{message}")
 
     # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
@@ -160,13 +160,13 @@ def from_bot_to_dispatcher(channel_id: str) -> str:
 
 def clear_queue(channel_id: str):
     "clear message queue (do this on start)"
-    comms_logger.info("Clearing message queue")
+    comms_logger.debug("Clearing message queue")
 
     # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 
     # message_channel = connection.channel()
 
-    message_channel.queue_delete(channel_id)
+    message_channel.queue_purge(channel_id)
 
     message_channel.queue_declare(channel_id)
 
@@ -193,7 +193,23 @@ def from_dispatcher_to_bot_manager(bot_id: str, command: str, data: str):
 def send_to_bot(bot_id: str, user_id: str, message: str, credentials: list = None):
     "encode and send a message directly to a bot using <bot_id>"
 
-    comms_logger.info(f"CHANNEL: {bot_id} - {message}")
+    comms_logger.debug(f"CHANNEL: {bot_id} - {message}")
+
+    # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+
+    # message_channel = connection.channel()
+
+    message_channel.queue_declare(queue=bot_id)
+    #message_and_history = f"*** {message}  *** Previous Request: {previous_request}, *** Previous Response: {previous_response}"
+
+    message = encode_response(user_id, message, credentials)
+
+    message_channel.basic_publish(exchange='',routing_key=bot_id,body=message)
+
+def send_command_to_bot(bot_id: str, user_id: str, message: str, credentials: list = None):
+    "encode and send a message directly to a bot using <bot_id>"
+
+    comms_logger.debug(f"CHANNEL: {bot_id} - {message}")
 
     # connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
 

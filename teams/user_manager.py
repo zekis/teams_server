@@ -25,6 +25,10 @@ class UserState:
         self.waiting_for_response = False
         self.waiting_for_response_credential = ""
         self.waiting_for_response_credential_bot_id = ""
+        self.previous_response = ""
+        self.previous_request = ""
+        self.previous_forward_bot = ""
+        self.previous_assistant = ""
         self.last_request = ""
         self.no_response = 0
 
@@ -39,7 +43,7 @@ class Bot:
 class UserManager:
     
     def __init__(self, frappe_base_url, api_key, api_secret):
-        self.logger = server_logging.logging.getLogger('UserManager') 
+        self.logger = server_logging.logging.getLogger('SERVER-USER-MANAGER') 
         self.logger.addHandler(server_logging.file_handler)
         self.logger.info(f"Init userManager")
         self.frappe_base_url = frappe_base_url
@@ -57,7 +61,7 @@ class UserManager:
 
     
     def add_user(self, user_id: str, user_name: str) -> bool:
-        self.logger.info(f"{user_id}")
+        self.logger.debug(f"{user_id}")
         #always update local state first
         new_user = UserState(user_id, user_name)
         self.users[user_id] = new_user
@@ -76,7 +80,7 @@ class UserManager:
         return True
 
     def load_users(self):
-        self.logger.info(f"Fetching users")
+        self.logger.debug(f"Fetching users")
 
         api_data = self.get_users_api()
         
@@ -114,7 +118,7 @@ class UserManager:
         # 2. Fetch user from the API
         endpoint = f'/resource/Teams%20User'
         response = self._send_request('GET', endpoint)
-        self.logger.info(str(response))
+        self.logger.debug(str(response))
 
         api_user_data = response.get('data', None) if response else None
         
@@ -132,7 +136,7 @@ class UserManager:
 
     
     def update_user(self, user_id: str, default_model: str) -> bool:
-        self.logger.info(f"Updating user with ID {user_id}")
+        self.logger.debug(f"Updating user with ID {user_id}")
         #update local state first
         self.users[user_id].teams_user_default_model = default_model
 
@@ -160,7 +164,7 @@ class UserManager:
 
 
     # def delete_user(self, user_id: str) -> bool:
-    #     self.logger.info(f"{user_id}")
+    #     self.logger.debug(f"{user_id}")
     #     # Assuming you have an endpoint '/user/<user_id>' to delete a user
     #     endpoint = f'/resource/Teams%20User/{user_id}'
     #     response = self._send_request('DELETE', endpoint)
@@ -169,7 +173,7 @@ class UserManager:
     #     return False
             
     def add_credential(self, user_id, name, value):
-        self.logger.info(f"{user_id}, {name}")
+        self.logger.debug(f"{user_id}, {name}")
         # Assuming endpoint '/teams_user/<user_id>' fetches a teams_user
         endpoint = f'/resource/Teams%20User/{user_id}'
         user = self._send_request('GET', endpoint).get('data')
@@ -257,14 +261,14 @@ class UserManager:
             return None
             
         #credentials = []
-        self.logger.info(user.get('teams_user_bots'))
+        self.logger.debug(user.get('teams_user_bots'))
         return user.get('teams_user_bots', [])
 
     def get_available_bots(self):
         # 2. Fetch user from the API
         endpoint = f'/resource/Teams%20Bot?fields=["name", "description"]'
         response = self._send_request('GET', endpoint)
-        # self.logger.info(str(response))
+        # self.logger.debug(str(response))
 
         api_bots_data = response.get('data', None) if response else None
         
@@ -312,7 +316,7 @@ class UserManager:
 
 
     def register_bot(self, user_id, bot_id):
-        self.logger.info(f"{user_id}, {bot_id}")
+        self.logger.debug(f"{user_id}, {bot_id}")
         # Assuming endpoint '/teams_user/<user_id>' fetches a teams_user
         endpoint = f'/resource/Teams%20User/{user_id}'
         user = self._send_request('GET', endpoint).get('data')
@@ -344,7 +348,7 @@ class UserManager:
     #         file_path = f"{self.data_dir}/users.pkl"
     #         with open(file_path, 'wb') as f:
     #             pickle.dump(self.users, f)
-    #             self.logger.info(f"Saving complete")
+    #             self.logger.debug(f"Saving complete")
     #             return True
     #     self.logger.warn(f"No users to save")
     #     return False
@@ -354,7 +358,7 @@ class UserManager:
     #     if os.path.exists(file_path):
     #         with open(file_path, 'rb') as f:
     #             self.users = pickle.load(f)
-    #             self.logger.info(f"{len(self.users)} users loaded")
+    #             self.logger.debug(f"{len(self.users)} users loaded")
     #             return True
     #     self.logger.warn(f"Could not find file {file_path}")
     #     return False

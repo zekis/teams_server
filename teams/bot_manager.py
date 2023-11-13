@@ -29,7 +29,7 @@ class BotConfig:
 class BotManager:
     
     def __init__(self, frappe_base_url, api_key, api_secret):
-        self.logger = server_logging.logging.getLogger('BotManager') 
+        self.logger = server_logging.logging.getLogger('SERVER-BOT-MANAGER') 
         self.logger.addHandler(server_logging.file_handler)
         self.frappe_base_url = frappe_base_url
         self.logger.info(f"Init BotManager")
@@ -65,16 +65,16 @@ class BotManager:
             new_bot.required_credentials.append(cred)
         self.bots.append(new_bot)
 
-        self.logger.info(f"{bot_id}")
+        self.logger.debug(f"{bot_id}")
         return True
 
     def add_bot_api(self, bot_id: str, bot_description: str, credentials: list) -> bool:
-        self.logger.info("Adding bot: %s", bot_id)
+        self.logger.debug("Adding bot: %s", bot_id)
 
         # Check if bot already exists
         existing_bot = self.get_bot_api(bot_id)
         if existing_bot is not None:
-            self.logger.info("Bot %s already exists.", bot_id)
+            self.logger.debug("Bot %s already exists.", bot_id)
             return True
 
         settings_package = []
@@ -106,7 +106,7 @@ class BotManager:
         # 2. Fetch user from the API
         endpoint = f'/resource/Teams%20Bot'
         response = self._send_request('GET', endpoint)
-        self.logger.info(str(response))
+        self.logger.debug(str(response))
 
         api_bots_data = response.get('data', None) if response else None
         
@@ -143,7 +143,7 @@ class BotManager:
         for bot in self.bots:
             if bot.bot_id == bot_id:
                 self.bots.remove(bot)
-                self.logger.info(f"{bot_id}")
+                self.logger.debug(f"{bot_id}")
                 return True
         return False
     """"""
@@ -168,7 +168,7 @@ class BotManager:
 
         for bot_id in bots_to_remove:
             self.delete_bot(bot_id)
-            self.logger.info(f"Removed bot with id {bot_id} due to age.")
+            self.logger.debug(f"Removed bot with id {bot_id} due to age.")
 
     def get_bot_config_str(self, bot_id: str) -> str:
         bot = self.get_bot(bot_id)

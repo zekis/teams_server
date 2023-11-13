@@ -12,8 +12,13 @@ APP_PASSWORD = os.getenv("MicrosoftAppPassword")
 BASE_URL = os.getenv("BASE_URL")
 DATA_DIR = "data"
 RESET_CONFIG = False
-VERBOSE = True
-MAIN_AI = "gpt-3.5-turbo-16k"
+VERBOSE = False
+
+MAIN_AI = "gpt-4"
+TOOL_AI = "gpt-4"
+SMART_AI = "gpt-4"
+
+
 MAX_IGNORED_USER_MESSAGE = 2
 DISPATCHER_CHANNEL_ID = "botmanager"
 
